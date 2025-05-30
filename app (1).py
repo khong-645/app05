@@ -6,26 +6,42 @@ from PIL import Image
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+import pytesseract
 
 # โหลดโมเดล MobileNetV2 ที่ฝึกบน ImageNet
 model = MobileNetV2(weights="imagenet")
 
-st.title("🧠 Image Classification with Grad-CAM")
-st.write("อัปโหลดภาพเพื่อให้โมเดลวิเคราะห์")
+st.title("🧠 Image Classification with Grad-CAM + Text Search")
+st.write("อัปโหลดภาพเพื่อให้โมเดลวิเคราะห์ และตรวจหาข้อความในภาพ")
 
-uploaded_file = st.file_uploader("เลือกรูปภาพ...", type=["jpg", "jpeg", "png"])
+# ช่องให้ผู้ใช้กรอกข้อความที่ต้องการค้นหา
+search_text = st.text_input("🔍 ป้อนข้อความที่ต้องการค้นหาในภาพ (เช่น Hello):")
+
+uploaded_file = st.file_uploader("📂 เลือกรูปภาพ...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
     image = Image.open(uploaded_file).convert("RGB")
     st.image(image, caption="📷 ภาพที่อัปโหลด", use_column_width=True)
 
-    # ปรับขนาดภาพ
+    # 🔍 ตรวจหาข้อความด้วย pytesseract
+    extracted_text = pytesseract.image_to_string(image)
+    st.write("📝 ข้อความที่ตรวจพบในภาพ:")
+    st.code(extracted_text)
+
+    # ตรวจว่าพบข้อความที่ผู้ใช้ต้องการหรือไม่
+    if search_text:
+        if search_text.lower() in extracted_text.lower():
+            st.success(f'✅ พบข้อความ "{search_text}" ในภาพนี้')
+        else:
+            st.warning(f'❌ ไม่พบข้อความ "{search_text}" ในภาพนี้')
+
+    # ⏩ ปรับขนาดภาพ
     image_resized = image.resize((224, 224))
     img_array = img_to_array(image_resized)
     img_array_expanded = np.expand_dims(img_array, axis=0)
     processed_img = preprocess_input(img_array_expanded)
 
-    # ทำนายผล
+    # 🔍 ทำนายผลด้วยโมเดล
     predictions = model.predict(processed_img)
     decoded_preds = decode_predictions(predictions, top=3)[0]
 
@@ -34,8 +50,8 @@ if uploaded_file is not None:
         st.write(f"**{i+1}. {label}** ({prob*100:.2f}%)")
         st.progress(int(prob * 100))
 
-    # Grad-CAM
-    st.write("### 🔥 Grad-CAM Visualization")
+    # 🔥 Grad-CAM Visualization
+    st.write("### 🔥 Grad-CAM Heatmap")
 
     grad_model = tf.keras.models.Model(
         [model.inputs], [model.get_layer("Conv_1").output, model.output]
@@ -57,7 +73,7 @@ if uploaded_file is not None:
     heatmap /= tf.reduce_max(heatmap)
     heatmap = heatmap.numpy()
 
-    # สร้าง heatmap และผสมกับภาพต้นฉบับ
+    # ผสม heatmap กับภาพต้นฉบับ
     heatmap_resized = Image.fromarray(np.uint8(255 * heatmap)).resize(image.size)
     colormap = cm.get_cmap("jet")
     colored_heatmap = colormap(np.array(heatmap_resized) / 255.0)
