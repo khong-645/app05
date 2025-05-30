@@ -1,2 +1,6 @@
-!sudo apt install tesseract-ocr
-!pip install pytesseract
+streamlit
+tensorflow
+pillow
+matplotlib
+numpy
+pytesseract
